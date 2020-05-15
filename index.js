@@ -2,6 +2,7 @@
  * The server
  *
  */
+const cookieParser = require('cookie-parser');
 const express = require('express');
 const url = require('url');
 const fetch = require('node-fetch');
@@ -12,12 +13,14 @@ const app = express();
 const port = 80;
 const oauthRedirectPath = '/oauth/redirect';
 
+//TODO: Read these values from environment or a config file (DON'T PUSH TO GITHUB WITH THIS REPO!)
 //const clientId = process.env.PATREON_CLIENT_ID
 const clientId = '7wL7w6W0MNfn98UUbTlY4daPYTdSrRMv657JUlnIseDP29iLCJ8XvDtZrTR-DOWG';
 //const clientSecret = process.env.PATREON_CLIENT_SECRET
 const clientSecret = 'cgQe0S-xT9aqi0iK2DsZzQiTBGefHO_OQaOkGKEMwrsVQQ-U6w8JiJo5f5jUC4UL';
 
 const redirectUrl = `http://localhost:${port}${oauthRedirectPath}`;
+const protectedRoute = '/app';
 
 const patreonLoginUrl = url.format({
     protocol: 'https',
@@ -27,7 +30,7 @@ const patreonLoginUrl = url.format({
         response_type: 'code',
         client_id: clientId,
         redirect_uri: redirectUrl,
-        scope: 'identity campaigns',
+        scope: 'identity',
         state: 'chill'
     }
 });
@@ -43,6 +46,7 @@ startServer();
 function initialConfiguration() {
     //app.use(bodyParser.json());
     //app.use(accessLogger);
+    app.use(cookieParser());
     app.use(express.static('public'));
     app.engine('mustache', require('mustache-express')());
     app.set('view engine', 'mustache')
@@ -52,20 +56,42 @@ function setupRouting() {
     app.get('/', showLoginPage);
     app.get('/login', showLoginPage);
     app.get(oauthRedirectPath, handleOauthRedirectFromPatreon);
-    app.get('/protected/:id', handleLoggedIntoProtectedPage);
+    app.get(protectedRoute, handleRequestForProtectedPage);
 }
 
 function handleOauthRedirectFromPatreon(req, res) {
-    console.log("Handle OAuth Redirect");
-    console.log(req.query);
-    console.log("------------------------------------------------------------------------");
-
     const code = req.query.code;
+    console.log(`* Got OAuth redirect from Patreon ${code}`);
 
+    requestAuthToken(code)
+        .then(oauthResponse => {
+            return requestIdentity(oauthResponse.access_token);
+        })
+        .then(memberData => {
+            console.log('+++ Got Member Data from Patreon', memberData);
+
+            //store user data in "database" TODO: use flat file so it persists between process restarts
+            database[memberData.id] = {
+                lastAccessCheck: Date.now(),
+                memberData
+            };
+
+            //TODO: make this cookie expire at the same rate as the Patreon token
+            res.cookie("id", memberData.id, {httpOnly: true});
+
+            return res.redirect(protectedRoute);
+        })
+        .catch(err => {
+            console.log('Error getting oauth token', err);
+            //TODO: show "sorry page"
+        });
+}
+
+function requestAuthToken(accessCode) {
     const params = {
         client_id: clientId,
         client_secret: clientSecret,
-        code: code,
+        code: accessCode,
         grant_type: 'authorization_code',
         redirect_uri: redirectUrl
     };
@@ -84,10 +110,6 @@ function handleOauthRedirectFromPatreon(req, res) {
 
     return fetch('https://www.patreon.com/api/oauth2/token', options)
         .then(response => response.json())
-        .then(({access_token}) => {
-            console.log('+++ got token response', access_token);
-            return requestIdentity(access_token);
-        });
 }
 
 function requestIdentity(accessToken) {
@@ -96,9 +118,10 @@ function requestIdentity(accessToken) {
         host: 'patreon.com',
         pathname: '/api/oauth2/v2/identity',
         query: {
-            include: 'memberships',
+            include: 'memberships.currently_entitled_tiers',
             'fields[user]': 'about,created,email,first_name,last_name',
-            'fields[member]': 'patron_status,is_follower,full_name,email,pledge_relationship_start,lifetime_support_cents,currently_entitled_amount_cents,last_charge_date,last_charge_status,will_pay_amount_cents'
+            'fields[member]': 'patron_status,is_follower,full_name,email,pledge_relationship_start,lifetime_support_cents,currently_entitled_amount_cents,last_charge_date,last_charge_status,will_pay_amount_cents',
+            'fields[tier]': 'description,title,amount_cents'
         }
     });
 
@@ -113,78 +136,79 @@ function requestIdentity(accessToken) {
     return fetch(identityUrl, options)
         .then(response => response.json())
         .then(json => {
-            console.dir(json, {depth: null})
-            console.log('================================================================');
+            //console.dir(json, {depth: null})
 
-            const userData = json.data.attributes;
-            const userName = userData.first_name + ' ' + userData.last_name;
+            const data = json.data || {};
+            const userData = data.attributes || {};
+            const fullName = userData.first_name + ' ' + userData.last_name;
 
-            console.log('Got identity response ' + userName);
-
-            const membership = (json.included || []).filter(o => o.type === 'member')[0];
-            console.log('Got membership ' + membership.id);
-
-            return getMembershipData(membership.id);
-        });
-
-    function getMembershipData(membershipId) {
-        const membershipUrl = url.format({
-            protocol: 'https',
-            host: 'patreon.com',
-            pathname: '/api/oauth2/v2/members/' + membershipId,
-            query: {
-                include: 'currently_entitled_tiers',
-                'fields[member]': 'full_name',
-                'fields[tier]': 'description,title,amount_cents'
+            if (typeof data.id !== 'string') {
+                console.log('Warning, got bad Identity response', data);
             }
+            else {
+                console.log('  Got identity response for user ' + fullName);
+            }
+
+            const otherData = (json['included'] || []);
+            const membership = otherData.filter(o => o.type === 'member')[0] || {};
+            const tier = otherData.filter(o => o.type === 'tier')[0] || {};
+
+            return {
+                id: data.id,
+                fullName,
+                accessToken,
+                membership: membership.attributes,
+                tier: tier.attributes
+            };
         });
-
-        const options = {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`
-            },
-            credentials: 'include'
-        };
-
-        console.log('membership request ' + membershipUrl);
-
-        return fetch(membershipUrl, options)
-            .then(response => response.json())
-            .then(json => {
-                console.log('Got membership response');
-                console.dir(json, {depth: null});
-            });
-    }
 }
 
+function handleRequestForProtectedPage(req, res) {
+    const cookies = req.cookies;
 
-function handleLoggedIntoProtectedPage(req, res) {
-    const {id} = req.params
+    console.log('*** =============== Begin Request For Calculator');
 
-    // load the user from the database
-    const user = database[id]
-    if (!user || !user.token) {
-        return res.redirect('/')
+    if (cookies && cookies['id']) {
+        const userId = cookies['id'];
+        console.log(`  * Has Cookie: yes (id ${userId})`);
+
+        const sessionData = database[userId];
+
+        if (sessionData && sessionData.lastAccessCheck) {
+            const memberData = sessionData.memberData || {};
+
+            //TODO: check if last API call time is within threshhold
+            const msElapsedSinceLastApiCheck = (Date.now() - sessionData.lastAccessCheck);
+            console.log(`  * Has saved user data (name ${memberData.fullName})`);
+
+            if (sessionData.lastAccessCheck) { //TODO: real check
+                console.log(`  * Last API check ok (${msElapsedSinceLastApiCheck / 1000}s ago)`);
+
+                if (memberData.tier) { //TODO: real check
+                    console.log(`  * membership data and pledge tier is ok (tier ${memberData.tier.title})`);
+                    //TODO: business logic to check if tier is good
+                    //access checks
+                    // user.patron_status = 'active patron'
+                    // tier.title == 'Hard Coded Name'
+                    // membership.currently_entitled_amount_cents >= tier.amount_cents;
+
+                    return res.render('successPage', {name: memberData.fullName, title: 'Success'});
+                }
+                else {
+                    console.log('  * Members pledge tier is not good enough');
+                    //res.render() //TODO: show a "sorry your pledge tier isn't good enough" message
+                }
+            }
+            else {
+                console.log('  * Need to update membership data from API');
+                //TODO: logic to refresh tokens and then repeat this check
+            }
+        }
+        else /*XXX*/ console.log('  * No user data: need to log in');
     }
+    else /*XXX*/console.log('  * No Cookie: need to log in');
 
-    const apiClient = patreon(user.token);
-
-    // make api requests concurrently
-    return apiClient('/current_user/campaigns')
-        .then(({store}) => {
-            const _user = store.find('user', id)
-            const campaign = _user.campaign ? _user.campaign.serialize().data : null;
-
-            console.log(JSON.stringify(campaign));
-
-            return res.send('<pre>' + JSON.stringify(campaign) + '</pre>');
-        }).catch((err) => {
-            const {status, statusText} = err
-            console.log('Failed to retrieve campaign info')
-            console.log(err)
-            return res.json({status, statusText})
-        });
+    return res.redirect('/login');
 }
 
 function startServer() {
