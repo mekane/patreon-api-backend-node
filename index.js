@@ -196,7 +196,7 @@ function handleRequestForProtectedPage(req, res) {
                 }
                 else {
                     console.log('  * Members pledge tier is not good enough');
-                    //res.render() //TODO: show a "sorry your pledge tier isn't good enough" message
+                    return res.render('tierTooLow', {tierName: memberData.tier.title, title: 'Access Denied'});
                 }
             }
             else {
