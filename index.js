@@ -3,8 +3,9 @@
  *
  */
 const express = require('express');
-const patreon = require('patreon');
 const url = require('url');
+const fetch = require('node-fetch');
+const formUrlEncode = require('form-urlencoded').default;
 
 const app = express();
 //const accessLogger = require('./accessLogger');
@@ -18,10 +19,6 @@ const clientSecret = 'cgQe0S-xT9aqi0iK2DsZzQiTBGefHO_OQaOkGKEMwrsVQQ-U6w8JiJo5f5
 
 const redirectUrl = `http://localhost:${port}${oauthRedirectPath}`;
 
-const patreonAPI = patreon.patreon;
-const patreonOAuth = patreon.oauth;
-const patreonOAuthClient = patreonOAuth(clientId, clientSecret);
-
 const patreonLoginUrl = url.format({
     protocol: 'https',
     host: 'patreon.com',
@@ -30,6 +27,7 @@ const patreonLoginUrl = url.format({
         response_type: 'code',
         client_id: clientId,
         redirect_uri: redirectUrl,
+        scope: 'identity campaigns',
         state: 'chill'
     }
 });
@@ -62,28 +60,104 @@ function handleOauthRedirectFromPatreon(req, res) {
     console.log(req.query);
     console.log("------------------------------------------------------------------------");
 
-    const {code} = req.query;
-    let token;
+    const code = req.query.code;
 
-    return patreonOAuthClient.getTokens(code, redirectUrl)
+    const params = {
+        client_id: clientId,
+        client_secret: clientSecret,
+        code: code,
+        grant_type: 'authorization_code',
+        redirect_uri: redirectUrl
+    };
+
+    const options = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'User-Agent': 'Node 10'
+        },
+        body: formUrlEncode(params),
+        params,
+        credentials: 'include',
+        compress: false
+    };
+
+    return fetch('https://www.patreon.com/api/oauth2/token', options)
+        .then(response => response.json())
         .then(({access_token}) => {
-            token = access_token
-            const apiClient = patreonAPI(token)
-            return apiClient('/current_user')
-        })
-        .then(({store, rawJson}) => {
-            const {id} = rawJson.data
-            database[id] = {...rawJson.data, token}
-            console.log(`Saved user ${store.find('user', id).full_name} to the database`)
-            return res.redirect(`/protected/${id}`)
-        })
-        .catch((err) => {
-            console.log(err);
-            console.log('Redirecting to login')
-            //res.redirect('/')
-            res.send(err);
+            console.log('+++ got token response', access_token);
+            return requestIdentity(access_token);
         });
 }
+
+function requestIdentity(accessToken) {
+    const identityUrl = url.format({
+        protocol: 'https',
+        host: 'patreon.com',
+        pathname: '/api/oauth2/v2/identity',
+        query: {
+            include: 'memberships',
+            'fields[user]': 'about,created,email,first_name,last_name',
+            'fields[member]': 'patron_status,is_follower,full_name,email,pledge_relationship_start,lifetime_support_cents,currently_entitled_amount_cents,last_charge_date,last_charge_status,will_pay_amount_cents'
+        }
+    });
+
+    const options = {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`
+        },
+        credentials: 'include'
+    };
+
+    return fetch(identityUrl, options)
+        .then(response => response.json())
+        .then(json => {
+            console.dir(json, {depth: null})
+            console.log('================================================================');
+
+            const userData = json.data.attributes;
+            const userName = userData.first_name + ' ' + userData.last_name;
+
+            console.log('Got identity response ' + userName);
+
+            const membership = (json.included || []).filter(o => o.type === 'member')[0];
+            console.log('Got membership ' + membership.id);
+
+            return getMembershipData(membership.id);
+        });
+
+    function getMembershipData(membershipId) {
+        const membershipUrl = url.format({
+            protocol: 'https',
+            host: 'patreon.com',
+            pathname: '/api/oauth2/v2/members/' + membershipId,
+            query: {
+                include: 'currently_entitled_tiers',
+                'fields[member]': 'full_name',
+                'fields[tier]': 'description,title,amount_cents'
+            }
+        });
+
+        const options = {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            },
+            credentials: 'include'
+        };
+
+        console.log('membership request ' + membershipUrl);
+
+        return fetch(membershipUrl, options)
+            .then(response => response.json())
+            .then(json => {
+                console.log('Got membership response');
+                console.dir(json, {depth: null});
+            });
+    }
+}
+
 
 function handleLoggedIntoProtectedPage(req, res) {
     const {id} = req.params
