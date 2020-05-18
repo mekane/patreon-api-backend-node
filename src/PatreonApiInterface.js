@@ -1,8 +1,10 @@
 const url = require('url');
 
 /**
- * Exports a function that returns a new instance of the Patreon API Interface backed by the provided implementation.
+ * Exports a factory function that returns a new instance of the Patreon API Interface backed by a communication module.
  * This is to enable testing and to decouple the code that uses this interface from the implementation details.
+ * This matters because there is some logic to do on this side, and we want to test that we handle things
+ * correctly based on how the network responds without having to do actual network calls in our tests.
  */
 function PatreonApiInterface(clientId, clientSecret, redirectUrl, communicationModule) {
     const api = communicationModule;

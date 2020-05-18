@@ -23,7 +23,7 @@ const PatreonApi = require('./src/PatreonApiInterface');
 const fetchCommsModule = require('./src/fetchCommsApiModule');
 const patreonApi = PatreonApi(clientId, clientSecret, redirectUrl, fetchCommsModule);
 
-let database = {};
+const dataStore = require('./src/InMemoryDataStore')();
 
 initialConfiguration();
 setupRouting();
@@ -51,17 +51,23 @@ function handleOauthRedirectFromPatreon(req, res) {
 
     patreonApi.getAccessToken(code)
         .then(oauthResponse => {
-            //return patreonApi.getIdentity(oauthResponse.access_token);
-            return patreonApi.getIdentity(oauthResponse.accessToken);
+            const expiresIn = oauthResponse.expiresIn;
+            const accessToken = oauthResponse.accessToken;
+
+            console.log(`  - token expires in ${expiresIn / 86400} days`);
+
+            return patreonApi.getIdentity(accessToken);
         })
         .then(memberData => {
             console.log('+++ Got Member Data from Patreon', memberData);
 
-            //store user data in "database" TODO: use flat file so it persists between process restarts
-            database[memberData.id] = {
+            const sessionData = {
                 lastAccessCheck: Date.now(),
                 memberData
-            };
+            }
+
+            //store session data in data store TODO: use flat file so it persists between process restarts
+            dataStore.set(memberData.id, sessionData);
 
             //TODO: make this cookie expire at the same rate as the Patreon token
             res.cookie("id", memberData.id, {httpOnly: true});
@@ -80,10 +86,10 @@ function handleRequestForProtectedPage(req, res) {
     console.log('*** =============== Begin Request For Calculator');
 
     if (cookies && cookies['id']) {
-        const userId = cookies['id'];
-        console.log(`  * Has Cookie: yes (id ${userId})`);
+        const sessionKey = cookies['id'];
+        console.log(`  * Has Cookie: yes (session key ${sessionKey})`);
 
-        const sessionData = database[userId];
+        const sessionData = dataStore.get(sessionKey);
 
         if (sessionData && sessionData.lastAccessCheck) {
             const memberData = sessionData.memberData || {};
