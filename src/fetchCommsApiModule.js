@@ -1,5 +1,9 @@
 /**
  * Implements communications with the Patreon API using the Node version of fetch
+ * This module's only responsibility is to encapsulate the details of building the
+ * URL's for the actual Patreon API and plumbing those through fetch.
+ * All further handling (including errors) should be done in the PatreonApiInterface.
+ * Note that this keeps the test mocks small and appropriately dumb.
  */
 
 const fetch = require('node-fetch');
@@ -28,10 +32,7 @@ function getAccessToken(clientId, clientSecret, accessCode, redirectUrl) {
     };
 
     return fetch('https://www.patreon.com/api/oauth2/token', options)
-        .then(response => response.json())
-        .catch(err => {
-            //TODO: handle error in token request
-        });
+        .then(response => response.json());
 }
 
 function getIdentity(accessToken) {
@@ -56,37 +57,7 @@ function getIdentity(accessToken) {
     };
 
     return fetch(identityUrl, options)
-        .then(response => response.json())
-        .then(json => {
-            //console.dir(json, {depth: null})
-
-            const data = json.data || {};
-            const userData = data.attributes || {};
-            const fullName = userData.first_name + ' ' + userData.last_name;
-
-            if (typeof data.id !== 'string') {
-                console.log('Warning, got bad Identity response', data);
-                // TODO: handle bad id response case(s)
-            }
-            else {
-                console.log('  Got identity response for user ' + fullName);
-            }
-
-            const otherData = (json['included'] || []);
-            const membership = otherData.filter(o => o.type === 'member')[0] || {};
-            const tier = otherData.filter(o => o.type === 'tier')[0] || {};
-
-            return {
-                id: data.id,
-                fullName,
-                accessToken,
-                membership: membership.attributes,
-                tier: tier.attributes
-            };
-        })
-        .catch(err => {
-            //TODO: handle error in response
-        });
+        .then(response => response.json());
 }
 
 module.exports = {

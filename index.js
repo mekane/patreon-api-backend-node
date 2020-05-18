@@ -51,7 +51,8 @@ function handleOauthRedirectFromPatreon(req, res) {
 
     patreonApi.getAccessToken(code)
         .then(oauthResponse => {
-            return patreonApi.getIdentity(oauthResponse.access_token);
+            //return patreonApi.getIdentity(oauthResponse.access_token);
+            return patreonApi.getIdentity(oauthResponse.accessToken);
         })
         .then(memberData => {
             console.log('+++ Got Member Data from Patreon', memberData);
