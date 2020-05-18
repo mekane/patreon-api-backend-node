@@ -98,6 +98,8 @@ function handleRequestForProtectedPage(req, res) {
 
     console.log('*** =============== Begin Request For Calculator');
 
+    // TODO: work out a business logic module that can be injected with all this state and unit test the various cases
+
     if (cookies && cookies['id']) {
         const sessionKey = cookies['id'];
         console.log(`  * Has Cookie: yes (session key ${sessionKey})`);

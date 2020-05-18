@@ -30,7 +30,55 @@ function getAccessToken(clientId, clientSecret, accessCode, redirectUrl) {
 }
 
 function getIdentity(accessToken) {
-    return Promise.resolve({});
+    return Promise.resolve({
+        data: {
+            attributes: {
+                about: '',
+                created: '2020-01-01T01:01:01.000+00:00',
+                first_name: 'Marty',
+                last_name: 'Kane'
+            },
+            id: '2002001',
+            relationships: {
+                memberships: {
+                    data: [
+                        {id: '0x0x8xN0-NNNx-NNxN-xxNx-xNxxNNNNNxxx', type: 'member'}
+                    ]
+                }
+            },
+            type: 'user'
+        },
+        included: [
+            {
+                attributes: {
+                    currently_entitled_amount_cents: 300,
+                    full_name: 'Marty Kane',
+                    is_follower: false,
+                    last_charge_date: null,
+                    last_charge_status: null,
+                    lifetime_support_cents: 0,
+                    patron_status: 'active_patron',
+                    pledge_relationship_start: '2020-05-15T02:57:13.881+00:00',
+                    will_pay_amount_cents: 300
+                },
+                id: '0x0x8xN0-NNNx-NNxN-xxNx-xNxxNNNNNxxx',
+                relationships: {currently_entitled_tiers: {data: [{id: '5550500', type: 'tier'}]}},
+                type: 'member'
+            },
+            {
+                attributes: {
+                    amount_cents: 300,
+                    description: 'Tier One',
+                    title: 'Tier 1 - Backer'
+                },
+                id: '5550500',
+                type: 'tier'
+            }
+        ],
+        links: {
+            self: 'https://www.patreon.com/api/oauth2/v2/user/2466753'
+        }
+    });
 }
 
 module.exports = {

@@ -37,6 +37,34 @@ describe('Getting Access Tokens', () => {
                 expect(result).to.be.an('object').with.keys(['errorCode', 'errorMessage', 'status']);
             });
     });
+});
 
+describe('Getting user identity and membership data', () => {
+    it(`resolves to a result object with expected properties`, () => {
+        return api.getIdentity('usingValidAccessToken')
+            .then(result => {
+                expect(result).to.be.an('object').with.keys(['id', 'fullName', 'accessToken', 'membership', 'tier']);
+            });
+    });
+
+    //TODO: error handling in API interface
+    it(`resolves to a result with default values if membership or tier data is missing`);
+
+    it(`resolves to an error if the access token wasn't good`);
+
+    it('resolves to an error if user data is missing');
+
+    it(`resolves to an error if something else went wrong`);
+
+    it(`resolves to an error if something goes wrong that causes the request to reject`);
+});
+
+describe('Getting the Patreon login url', () => {
+    it('uses injected values to build a login URL', () => {
+        const expectedUrl = 'https://patreon.com/oauth2/authorize?response_type=code&client_id=clientId&redirect_uri=redirectUrl&scope=identity&state=chill';
+        const actualUrl = api.getLoginUrl();
+
+        expect(actualUrl).to.equal(expectedUrl);
+    });
 });
 
