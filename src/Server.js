@@ -54,7 +54,7 @@ function handleOauthRedirectFromPatreon(req, res) {
     const code = req.query.code;
     const userDeniedAuthorization = (typeof code === 'undefined');
 
-    if (userDeniedAuthorization ){
+    if (userDeniedAuthorization) {
         console.log('* User denied authorization')
         //TODO: render a nicer "you need to authorize" page
         return res.send('<h1>You need to authorize the app to log into the calculator</h1>');
@@ -69,13 +69,14 @@ function handleOauthRedirectFromPatreon(req, res) {
 
             console.log(`  - token expires in ${expiresIn / 86400} days`);
 
-            return patreonApi.getIdentity(accessToken);
+            return patreonApi.getIdentity(accessToken); //TODO: we actually just need to store the accessToken and then redirect to protected route
+
         })
         .then(memberData => {
             console.log('+++ Got Member Data from Patreon', memberData);
 
             const sessionData = {
-                lastAccessCheck: Date.now(),
+                lastAccessCheck: Date.now(), //TODO: move this to the cache in the patreonApi module
                 memberData
             }
 
@@ -97,6 +98,13 @@ function handleRequestForProtectedPage(req, res) {
     const cookies = req.cookies;
 
     console.log('*** =============== Begin Request For Calculator');
+
+    // 1) Get cookie from session
+    // 2) Get session data from dataStore based on cookie => login if no session for cookie or missing cookie
+    // 3) Make Patreon API call using access token stored in session
+    // 4) Pass that data into the business rules module
+    // 5) Render appropriate response based on return from logic module
+
 
     // TODO: work out a business logic module that can be injected with all this state and unit test the various cases
 
