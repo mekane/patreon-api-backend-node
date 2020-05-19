@@ -45,7 +45,7 @@ function PatreonApiInterface(clientId, clientSecret, redirectUrl, communicationM
     function getIdentity(accessToken) {
         return api.getIdentity(accessToken)
             .then(json => {
-                console.dir(json, {depth: null})
+                //console.dir(json, {depth: null})
 
                 const data = json.data || {};
                 const userData = data.attributes || {};

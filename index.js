@@ -5,7 +5,7 @@
 const PatreonApi = require('./src/PatreonApiInterface');
 const fetchCommsModule = require('./src/fetchCommsApiModule');
 const DataStore = require('./src/InMemoryDataStore');
-
+const Policy = require('./src/Policy');
 const server = require('./src/Server');
 
 const port = 80;
@@ -21,4 +21,7 @@ const redirectUrl = `http://localhost:${port}${oauthRedirectPath}`;
 const patreonApi = PatreonApi(clientId, clientSecret, redirectUrl, fetchCommsModule);
 const dataStore = DataStore();
 
-server.initialize(port, oauthRedirectPath, patreonApi, dataStore);
+const minimumPledgeCents = config.minimumPledgeCents || 500;
+const policy = Policy({minimumPledgeCents});
+
+server.initialize(port, oauthRedirectPath, patreonApi, dataStore, policy);

@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const express = require('express');
 
 /**
@@ -17,19 +18,22 @@ const express = require('express');
  * satisfactory they are allowed to see the page (i.e. it is rendered) otherwise we render
  * an error page.
  */
+const sessionCookieName = 'id';
 const protectedRoute = '/app';
 
 let patreonApi;
 let dataStore;
+let policy;
 
 let initialized = false;
 
-function initialize(port, oauthPath, injectedPatreonApi, injectedDataStore) {
+function initialize(port, oauthPath, injectedPatreonApi, injectedDataStore, injectedPolicy) {
     if (initialized)
         throw new Error('Error server is already running!');
 
     patreonApi = injectedPatreonApi;
     dataStore = injectedDataStore;
+    policy = injectedPolicy;
 
     const app = express();
     //app.use(accessLogger);
@@ -52,103 +56,109 @@ function initialize(port, oauthPath, injectedPatreonApi, injectedDataStore) {
 // We tell Patreon to send the user here after they authorize the integration
 function handleOauthRedirectFromPatreon(req, res) {
     const code = req.query.code;
+    console.log(`* Got OAuth response from Patreon ${code}`);
+
     const userDeniedAuthorization = (typeof code === 'undefined');
 
     if (userDeniedAuthorization) {
+        showYouNeedToAuthorizePage();
+    }
+
+    patreonApi.getAccessToken(code)
+        .then(saveAccessTokenInSession)
+        .then(redirectToProtectedRoute)
+        .catch(showOauthErrorPage)
+
+    function showYouNeedToAuthorizePage() {
         console.log('* User denied authorization')
         //TODO: render a nicer "you need to authorize" page
         return res.send('<h1>You need to authorize the app to log into the calculator</h1>');
     }
 
-    console.log(`* Got OAuth redirect from Patreon ${code}`);
+    function saveAccessTokenInSession(oauthResponse) {
+        const expiresIn = oauthResponse.expiresIn;
+        const sessionData = oauthResponse.accessToken;
 
-    patreonApi.getAccessToken(code)
-        .then(oauthResponse => {
-            const expiresIn = oauthResponse.expiresIn;
-            const accessToken = oauthResponse.accessToken;
+        const sessionKey = 'gdf' + crypto.randomBytes(20).toString('hex');
 
-            console.log(`  - token expires in ${expiresIn / 86400} days`);
+        dataStore.set(sessionKey, sessionData);
+        res.cookie(sessionCookieName, sessionKey, {httpOnly: true, SameSite: 'Strict', 'Max-Age': expiresIn});
+    }
 
-            return patreonApi.getIdentity(accessToken); //TODO: we actually just need to store the accessToken and then redirect to protected route
+    function redirectToProtectedRoute(_) {
+        return res.redirect(protectedRoute);
+    }
 
-        })
-        .then(memberData => {
-            console.log('+++ Got Member Data from Patreon', memberData);
-
-            const sessionData = {
-                lastAccessCheck: Date.now(), //TODO: move this to the cache in the patreonApi module
-                memberData
-            }
-
-            //store session data in data store TODO: use flat file so it persists between process restarts
-            dataStore.set(memberData.id, sessionData);
-
-            //TODO: make this cookie expire at the same rate as the Patreon token
-            res.cookie("id", memberData.id, {httpOnly: true});
-
-            return res.redirect(protectedRoute);
-        })
-        .catch(err => {
-            console.log('Error getting oauth token', err);
-            //TODO: show "sorry page"
-        });
+    function showOauthErrorPage(err) {
+        console.log('Error getting oauth token', err);
+        //TODO: show "sorry page"
+    }
 }
 
 function handleRequestForProtectedPage(req, res) {
-    const cookies = req.cookies;
-
     console.log('*** =============== Begin Request For Calculator');
 
     // 1) Get cookie from session
+    const sessionKey = getSessionKeyFromCookie();
+
     // 2) Get session data from dataStore based on cookie => login if no session for cookie or missing cookie
+    const accessToken = getAccessKeyFromSessionData(sessionKey);
+
     // 3) Make Patreon API call using access token stored in session
-    // 4) Pass that data into the business rules module
-    // 5) Render appropriate response based on return from logic module
+    patreonApi.getIdentity(accessToken)
+        .then(membershipData => {
+            const action = policy.decideAccessByMembership(membershipData);
 
+            console.log('  action', action);
 
-    // TODO: work out a business logic module that can be injected with all this state and unit test the various cases
-
-    if (cookies && cookies['id']) {
-        const sessionKey = cookies['id'];
-        console.log(`  * Has Cookie: yes (session key ${sessionKey})`);
-
-        const sessionData = dataStore.get(sessionKey);
-
-        if (sessionData && sessionData.lastAccessCheck) {
-            const memberData = sessionData.memberData || {};
-
-            //TODO: check if last API call time is within threshhold
-            const msElapsedSinceLastApiCheck = (Date.now() - sessionData.lastAccessCheck);
-            console.log(`  * Has saved user data (name ${memberData.fullName})`);
-
-            if (sessionData.lastAccessCheck) { //TODO: real check
-                console.log(`  * Last API check ok (${msElapsedSinceLastApiCheck / 1000}s ago)`);
-
-                if (memberData.tier) { //TODO: real check
-                    console.log(`  * membership data and pledge tier is ok (tier ${memberData.tier.title})`);
-                    //TODO: business logic to check if tier is good
-                    //access checks
-                    // user.patron_status = 'active patron'
-                    // tier.title == 'Hard Coded Name'
-                    // membership.currently_entitled_amount_cents >= tier.amount_cents;
-
-                    return res.render('successPage', {name: memberData.fullName, title: 'Success'});
-                }
-                else {
-                    console.log('  * Members pledge tier is not good enough');
-                    return res.render('tierTooLow', {tierName: memberData.tier.title, title: 'Access Denied'});
-                }
+            if (action.success) {
+                return res.render('successPage', {name: membershipData.fullName, title: 'Success'});
             }
             else {
-                console.log('  * Need to update membership data from API');
-                //TODO: logic to refresh tokens and then repeat this check
+                switch (action.errorType) {
+                    case policy.ERROR_INVALID:
+                        //TODO: generate a unique code to log and report to user in this case
+                        return res.render('invalidDataError', {title: 'Patreon Data Error'});
+                    case policy.ERROR_INACTIVE:
+                        return res.render('inactivePledgeDenied', {title: 'Patreon User Inactive'});
+                    case policy.ERROR_INSUFFICIENT:
+                        return res.render('insufficientPledgeDenied', {
+                            title: 'Insufficient Pledge Tier',
+                            tierName: membershipData.tier.title
+                        });
+                }
             }
-        }
-        else /*XXX*/ console.log('  * No user data: need to log in');
-    }
-    else /*XXX*/console.log('  * No Cookie: need to log in');
+        })
+        .catch(err => {
+            console.log(err); //TODO: better logging that can track requests better
+            return res.render('invalidDataError', {title: 'Patreon Data Error'});
+        });
 
-    return res.redirect('/login');
+    function getSessionKeyFromCookie() {
+        const cookies = req.cookies;
+        if (cookies && cookies[sessionCookieName])
+            return cookies[sessionCookieName];
+        return null;
+    }
+
+    function getAccessKeyFromSessionData(key) {
+        return dataStore.get(sessionKey);
+    }
+
+    /*
+        // TODO: work out a business logic module that can be injected with all this state and unit test the various cases
+        if (memberData.tier) { //TODO: real check
+            console.log(`  * membership data and pledge tier is ok (tier ${memberData.tier.title})`);
+            //TODO: business logic to check if tier is good
+            //access checks
+            // user.patron_status = 'active patron'
+            // tier.title == 'Hard Coded Name'
+            // membership.currently_entitled_amount_cents >= tier.amount_cents;
+
+            console.log('  * Members pledge tier is not good enough');
+            return res.render('tierTooLow', {tierName: memberData.tier.title, title: 'Access Denied'});
+        }
+    */
 }
 
 
