@@ -24,4 +24,12 @@ const dataStore = DataStore();
 const minimumPledgeCents = config.minimumPledgeCents || 500;
 const policy = Policy({minimumPledgeCents});
 
-server.initialize(port, oauthRedirectPath, patreonApi, dataStore, policy);
+const logger = require('node-file-logger');
+logger.SetUserOptions({
+    timeZone: 'Etc/UTC',
+    folderPath: './logs/',
+    dateBasedFileNaming: true,
+    fileNamePrefix: 'DailyLogs_'
+});
+
+server.initialize(port, oauthRedirectPath, patreonApi, dataStore, policy, logger);

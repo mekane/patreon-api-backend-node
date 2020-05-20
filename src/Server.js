@@ -24,16 +24,18 @@ const protectedRoute = '/app';
 let patreonApi;
 let dataStore;
 let policy;
+let logger;
 
 let initialized = false;
 
-function initialize(port, oauthPath, injectedPatreonApi, injectedDataStore, injectedPolicy) {
+function initialize(port, oauthPath, injectedPatreonApi, injectedDataStore, injectedPolicy, injectedLogger) {
     if (initialized)
         throw new Error('Error server is already running!');
 
     patreonApi = injectedPatreonApi;
     dataStore = injectedDataStore;
     policy = injectedPolicy;
+    logger = injectedLogger;
 
     const app = express();
     //app.use(accessLogger);
@@ -56,13 +58,13 @@ function initialize(port, oauthPath, injectedPatreonApi, injectedDataStore, inje
 // We tell Patreon to send the user here after they authorize the integration
 function handleOauthRedirectFromPatreon(req, res) {
     const code = req.query.code;
-    console.log(`* Got OAuth response from Patreon ${code}`);
-
     const userDeniedAuthorization = (typeof code === 'undefined');
 
     if (userDeniedAuthorization) {
-        showYouNeedToAuthorizePage();
+        return showYouNeedToAuthorizePage();
     }
+
+    console.log(`* Got OAuth response from Patreon ${code}`);
 
     patreonApi.getAccessToken(code)
         .then(saveAccessTokenInSession)
@@ -106,32 +108,38 @@ function handleRequestForProtectedPage(req, res) {
 
     // 3) Make Patreon API call using access token stored in session
     patreonApi.getIdentity(accessToken)
-        .then(membershipData => {
-            const action = policy.decideAccessByMembership(membershipData);
+        .then(patreonUserData => {
+            const action = policy.decideAccessByMembership(patreonUserData);
 
             console.log('  action', action);
 
             if (action.success) {
-                return res.render('successPage', {name: membershipData.fullName, title: 'Success'});
+                logger.Info(`Successful access by ${patreonUserData.fullName}`, `Session ${sessionKey}`);
+                return res.render('successPage', {name: patreonUserData.fullName, title: 'Success'});
             }
             else {
                 switch (action.errorType) {
                     case policy.ERROR_INVALID:
                         //TODO: generate a unique code to log and report to user in this case
-                        return res.render('invalidDataError', {title: 'Patreon Data Error'});
+                        logger.Error(`Invalid user data ${JSON.stringify(patreonUserData)}`, `Session ${sessionKey}`);
+                        return res.render('invalidDataError', {title: 'Patreon Data Error', reqestId: sessionKey});
                     case policy.ERROR_INACTIVE:
+                        logger.Error(`User ${patreonUserData.fullName} denied access because they are inactive`, `Session ${sessionKey}`);
                         return res.render('inactivePledgeDenied', {title: 'Patreon User Inactive'});
                     case policy.ERROR_INSUFFICIENT:
+                        logger.Error(`User ${patreonUserData.fullName} denied access because their pledge tier is too low ${JSON.stringify(patreonUserData.tier)}`, `Session ${sessionKey}`);
                         return res.render('insufficientPledgeDenied', {
                             title: 'Insufficient Pledge Tier',
-                            tierName: membershipData.tier.title
+                            tierName: patreonUserData.tier.title
                         });
+                    default:
+                        logger.Fatal(`This should not happen ${JSON.stringify(patreonUserData)}`, `Session ${sessionKey}`);
                 }
             }
         })
         .catch(err => {
-            console.log(err); //TODO: better logging that can track requests better
-            return res.render('invalidDataError', {title: 'Patreon Data Error'});
+            logger.Error(`Error getting Patreon user data ${JSON.stringify(err)}`, `Session ${sessionKey}`);
+            return res.render('invalidDataError', {title: 'Patreon Data Error', reqestId: sessionKey});
         });
 
     function getSessionKeyFromCookie() {
