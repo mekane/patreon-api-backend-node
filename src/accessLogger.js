@@ -6,7 +6,7 @@ function isEmptyObject(obj) {
 function accessLogger(req, res, next) {
     const date = new Date().toDateString();
     const path = req.path;
-    console.log(`${date} ${req.method} ${path}`);
+    console.log(`${date} ${req.ip} ${req.method} ${path}`);
     next();
 }
 

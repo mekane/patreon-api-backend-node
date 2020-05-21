@@ -8,7 +8,9 @@ const DataStore = require('./src/InMemoryDataStore');
 const Policy = require('./src/Policy');
 const server = require('./src/Server');
 
+//TODO: these should be configurable
 const port = 80;
+const hostname = 'localhost';
 
 const config = require('./config.json');
 const clientId = config.clientId || "";
@@ -16,7 +18,7 @@ const clientSecret = config.clientSecret || "";
 
 const oauthRedirectPath = '/oauth/redirect';
 //Note, the value of redirectUrl must match exactly with a value provided in the Patreon app web form
-const redirectUrl = `http://localhost:${port}${oauthRedirectPath}`;
+const redirectUrl = `http://${hostname}:${port}${oauthRedirectPath}`;
 
 const patreonApi = PatreonApi(clientId, clientSecret, redirectUrl, fetchCommsModule);
 const dataStore = DataStore();
@@ -29,7 +31,7 @@ logger.SetUserOptions({
     timeZone: 'Etc/UTC',
     folderPath: './logs/',
     dateBasedFileNaming: true,
-    fileNamePrefix: 'DailyLogs_'
+    fileNamePrefix: 'Access_'
 });
 
 server.initialize(port, oauthRedirectPath, patreonApi, dataStore, policy, logger);

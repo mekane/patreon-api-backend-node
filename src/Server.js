@@ -1,3 +1,4 @@
+const accessLogger = require('./accessLogger');
 const crypto = require('crypto');
 const express = require('express');
 
@@ -38,11 +39,12 @@ function initialize(port, oauthPath, injectedPatreonApi, injectedDataStore, inje
     logger = injectedLogger;
 
     const app = express();
-    //app.use(accessLogger);
+    app.use(accessLogger);
     app.use(require('cookie-parser')());
     app.use(express.static('public'));
     app.engine('mustache', require('mustache-express')());
     app.set('view engine', 'mustache')
+    app.set('trust proxy', true);
 
     // Setup Routing
     app.get('/', showLoginPage);
