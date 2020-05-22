@@ -95,20 +95,17 @@ function handleOauthRedirectFromPatreon(req, res) {
 
     function showOauthErrorPage(err) {
         console.log('Error getting oauth token', err);
-        //TODO: show "sorry page"
+        logger.Error(`OAuth error getting user access token ${JSON.stringify(req.query)}`, 'handleOAuthResponse');
+        return res.render('invalidDataError', {title: 'Patreon Data Error', reqestId: `OAuth_Reponse_${code}`});
     }
 }
 
 function handleRequestForProtectedPage(req, res) {
     console.log('*** =============== Begin Request For Calculator');
 
-    // 1) Get cookie from session
     const sessionKey = getSessionKeyFromCookie();
-
-    // 2) Get session data from dataStore based on cookie => login if no session for cookie or missing cookie
     const accessToken = getAccessKeyFromSessionData(sessionKey);
 
-    // 3) Make Patreon API call using access token stored in session
     patreonApi.getIdentity(accessToken)
         .then(patreonUserData => {
             const action = policy.decideAccessByMembership(patreonUserData);
@@ -122,7 +119,6 @@ function handleRequestForProtectedPage(req, res) {
             else {
                 switch (action.errorType) {
                     case policy.ERROR_INVALID:
-                        //TODO: generate a unique code to log and report to user in this case
                         logger.Error(`Invalid user data ${JSON.stringify(patreonUserData)}`, `Session ${sessionKey}`);
                         return res.render('invalidDataError', {title: 'Patreon Data Error', reqestId: sessionKey});
                     case policy.ERROR_INACTIVE:
@@ -154,21 +150,6 @@ function handleRequestForProtectedPage(req, res) {
     function getAccessKeyFromSessionData(key) {
         return dataStore.get(sessionKey);
     }
-
-    /*
-        // TODO: work out a business logic module that can be injected with all this state and unit test the various cases
-        if (memberData.tier) { //TODO: real check
-            console.log(`  * membership data and pledge tier is ok (tier ${memberData.tier.title})`);
-            //TODO: business logic to check if tier is good
-            //access checks
-            // user.patron_status = 'active patron'
-            // tier.title == 'Hard Coded Name'
-            // membership.currently_entitled_amount_cents >= tier.amount_cents;
-
-            console.log('  * Members pledge tier is not good enough');
-            return res.render('tierTooLow', {tierName: memberData.tier.title, title: 'Access Denied'});
-        }
-    */
 }
 
 

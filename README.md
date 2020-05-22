@@ -31,3 +31,8 @@ your Patreon client config section where you registered your application.
  * Currently uses an in-memory data store so if the node process is restarted all sessions are lost and users will need
    to repeat the "connect to Patreon" OAuth process. Enhancement would be to use a simple flat-file database to save 
    the session data.
+ * Re-queries the user's Patreon pledge status every time they access the protected route. Need to cache this for a
+   short but reasonable amount of time.
+ * The word "calculator" is hard-coded in a few places, which is kinda silly. Could easily be parameterized.
+ * The PatreonAPI Interface has some pending test cases to handle some error cases that are hopefully uncommon (but
+   still need to be handled at some point).

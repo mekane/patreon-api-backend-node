@@ -1,7 +1,6 @@
 /**
  * This is "Main" where all of the modules are imported, configured, and tied together and the app is started.
  */
-//const accessLogger = require('./accessLogger');
 const PatreonApi = require('./src/PatreonApiInterface');
 const fetchCommsModule = require('./src/fetchCommsApiModule');
 const DataStore = require('./src/InMemoryDataStore');
@@ -23,6 +22,7 @@ const dataStore = DataStore();
 const minimumPledgeCents = config.minimumPledgeCents || 500;
 const policy = Policy({minimumPledgeCents});
 
+//TODO: make a generic logging interface that wraps this and pass the wrapper into the server
 const logger = require('node-file-logger');
 logger.SetUserOptions({
     timeZone: 'Etc/UTC',
