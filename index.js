@@ -16,6 +16,7 @@ const oauthRedirectPath = '/oauth/redirect';
 //Note, the value of redirectUrl must match exactly with a value provided in the Patreon app web form
 const redirectUrl = `http://${config.hostname}:${config.port}${oauthRedirectPath}`;
 
+console.log(`Redirect URI: ${redirectUrl}`);
 const patreonApi = PatreonApi(clientId, clientSecret, redirectUrl, fetchCommsModule);
 const dataStore = DataStore();
 
