@@ -1,7 +1,9 @@
 const expect = require('chai').expect;
 
+const magicUser = {fullName: 'Magic User'};
+
 const Policy = require('../src/Policy');
-const policy = Policy({minimumPledgeCents: 500});
+const policy = Policy({minimumPledgeCents: 500, magicUsers: [magicUser.fullName]});
 
 describe('Error types', () => {
     it('defines constants for error types', () => {
@@ -57,6 +59,27 @@ describe('Action decisions based on the membership data', () => {
             success: true
         };
         expect(policy.decideAccessByMembership(sufficientPledgeUserData)).to.deep.equal(expectedResponse);
+    });
+
+    it('always returns success if the fullName matches a magic user', () => {
+        const nonPledge = Object.assign({}, nonPledgingPatreonUser, magicUser);
+        const nonMember = Object.assign({}, nonPledgingMember, magicUser);
+        const formerMember = Object.assign({}, formerMembership, magicUser);
+        const inactiveMember = Object.assign({}, inactiveMembership, magicUser);
+        const activeMember = Object.assign({}, activePledgeUserData, magicUser);
+        const pledgingMember = Object.assign({}, sufficientPledgeUserData, magicUser);
+
+        const success = {
+            success: true
+        };
+
+        expect(policy.decideAccessByMembership(nonPledge)).to.deep.equal(success);
+        expect(policy.decideAccessByMembership(nonMember)).to.deep.equal(success);
+        expect(policy.decideAccessByMembership(formerMember)).to.deep.equal(success);
+        expect(policy.decideAccessByMembership(inactiveMember)).to.deep.equal(success);
+        expect(policy.decideAccessByMembership(activeMember)).to.deep.equal(success);
+        expect(policy.decideAccessByMembership(pledgingMember)).to.deep.equal(success);
+
     });
 });
 

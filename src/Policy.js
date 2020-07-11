@@ -2,11 +2,16 @@ const ERROR_INACTIVE = 'ERROR_INACTIVE';
 const ERROR_INVALID = 'ERROR_INVALID';
 const ERROR_INSUFFICIENT = 'ERROR_INSUFFICIENT';
 
-const Policy = function(config) {
+const Policy = function(config = {}) {
     const minimumPledge = config.minimumPledgeCents;
+    const magicUsers = config.magicUsers || [];
 
     function decideAccessByMembership(data) {
         if (data && data.id && data.fullName && data.accessToken) {
+            if (magicUsers.some(name => name === data.fullName)) {
+                return {success: true}
+            }
+
             if (data.membership) {
                 const membership = data.membership;
 
@@ -14,9 +19,7 @@ const Policy = function(config) {
                     const currentPledgeAmount = membership.currently_entitled_amount_cents;
 
                     if (currentPledgeAmount >= minimumPledge) {
-                        return {
-                            success: true
-                        };
+                        return {success: true};
                     }
                     return {
                         success: false,
