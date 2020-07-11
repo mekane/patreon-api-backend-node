@@ -55,9 +55,6 @@ function PatreonApiInterface(clientId, clientSecret, redirectUrl, communicationM
                     console.log('Warning, got bad Identity response', data);
                     // TODO: handle bad id response case(s)
                 }
-                else {
-                    console.log('  Got identity response for user ' + fullName);
-                }
 
                 const otherData = (json['included'] || []);
                 const membership = otherData.filter(o => o.type === 'member')[0] || {};

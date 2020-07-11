@@ -101,16 +101,18 @@ function handleOauthRedirectFromPatreon(req, res) {
 }
 
 function handleRequestForProtectedPage(req, res) {
-    console.log('*** =============== Begin Request For Calculator');
+    console.log('=============== Begin Request For Calculator ===============');
 
     const sessionKey = getSessionKeyFromCookie();
     const accessToken = getAccessKeyFromSessionData(sessionKey);
 
     patreonApi.getIdentity(accessToken)
         .then(patreonUserData => {
+            console.log(`Patreon User Data: `, JSON.stringify(patreonUserData, null, 2));
+
             const action = policy.decideAccessByMembership(patreonUserData);
 
-            console.log('  action', action);
+            console.log('Policy result:', action);
 
             if (action.success) {
                 logger.Info(`Successful access by ${patreonUserData.fullName}`, `Session ${sessionKey}`);
