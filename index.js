@@ -20,7 +20,7 @@ const patreonApi = PatreonApi(clientId, clientSecret, redirectUrl, fetchCommsMod
 const dataStore = DataStore();
 
 const minimumPledgeCents = config.minimumPledgeCents || 500;
-const policy = Policy({minimumPledgeCents});
+const policy = Policy({minimumPledgeCents, magicUsers: config.magicUsers || []});
 
 //TODO: make a generic logging interface that wraps this and pass the wrapper into the server
 const logger = require('node-file-logger');

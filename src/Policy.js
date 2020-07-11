@@ -9,7 +9,10 @@ const Policy = function(config = {}) {
     function decideAccessByMembership(data) {
         if (data && data.id && data.fullName && data.accessToken) {
             if (magicUsers.some(name => name === data.fullName)) {
-                return {success: true}
+                return {
+                    success: true,
+                    reason: 'Magic User'
+                }
             }
 
             if (data.membership) {
@@ -19,7 +22,10 @@ const Policy = function(config = {}) {
                     const currentPledgeAmount = membership.currently_entitled_amount_cents;
 
                     if (currentPledgeAmount >= minimumPledge) {
-                        return {success: true};
+                        return {
+                            success: true,
+                            reason: 'Sufficient Pledge'
+                        };
                     }
                     return {
                         success: false,

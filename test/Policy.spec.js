@@ -56,7 +56,8 @@ describe('Action decisions based on the membership data', () => {
 
     it('returns success if the member is active and has a high enough pledge', () => {
         const expectedResponse = {
-            success: true
+            success: true,
+            reason: 'Sufficient Pledge'
         };
         expect(policy.decideAccessByMembership(sufficientPledgeUserData)).to.deep.equal(expectedResponse);
     });
@@ -70,7 +71,8 @@ describe('Action decisions based on the membership data', () => {
         const pledgingMember = Object.assign({}, sufficientPledgeUserData, magicUser);
 
         const success = {
-            success: true
+            success: true,
+            reason: 'Magic User'
         };
 
         expect(policy.decideAccessByMembership(nonPledge)).to.deep.equal(success);
