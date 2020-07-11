@@ -24,6 +24,16 @@ describe('Action decisions based on the membership data', () => {
         expect(policy.decideAccessByMembership({tier: {}})).to.deep.equal(expectedError);
     });
 
+    it('returns an INACTIVE error if they are a Patreon user with no pledge', () => {
+        const expectedError = {
+            success: false,
+            errorType: policy.ERROR_INACTIVE
+        };
+
+        expect(policy.decideAccessByMembership(nonPledgingPatreonUser)).to.deep.equal(expectedError);
+        expect(policy.decideAccessByMembership(nonPledgingMember)).to.deep.equal(expectedError);
+    });
+
     it('returns an INACTIVE error if the membership is not active', () => {
         const expectedError = {
             success: false,
@@ -31,6 +41,7 @@ describe('Action decisions based on the membership data', () => {
         };
 
         expect(policy.decideAccessByMembership(inactiveMembership)).to.deep.equal(expectedError);
+        expect(policy.decideAccessByMembership(formerMembership)).to.deep.equal(expectedError);
     });
 
     it(`returns an INSUFFICIENT error if the pledge amount doesn't meet the minimum`, () => {
@@ -50,9 +61,44 @@ describe('Action decisions based on the membership data', () => {
 });
 
 /* Note that this is the form that it takes when coming back from the API Interface */
+
+var nonPledgingPatreonUser = {
+    id: '2002001',
+    fullName: 'Marty Kane',
+    accessToken: 'XX_NXX_BNxXxxxNxKxxKNNwXXxxXXXXxNxXNHHxxNxx'
+}
+
+var nonPledgingMember = {
+    id: '2002001',
+    fullName: 'Marty Kane',
+    accessToken: 'XX_NXX_BNxXxxxNxKxxKNNwXXxxXXXXxNxXNHHxxNxx',
+    membership: {
+        id: 'something_weird',
+        helpful: 'no_not_really'
+    }
+}
+
+var formerMembership = {
+    id: '2002001',
+    fullName: 'Marty Kane',
+    accessToken: 'XX_NXX_BNxXxxxNxKxxKNNwXXxxXXXXxNxXNHHxxNxx',
+    membership: {
+        currently_entitled_amount_cents: 0,
+        full_name: "Marty Kane",
+        is_follower: false,
+        last_charge_date: "2020-06-01T22:09:48.000+00:00",
+        last_charge_status: "Paid",
+        lifetime_support_cents: 300,
+        patron_status: "former_patron",
+        pledge_relationship_start: "2020-07-11T03:26:00.481+00:00",
+        will_pay_amount_cents: 0
+    }
+}
+
 var inactiveMembership = {
     id: '2002001',
     fullName: 'Marty Kane',
+    accessToken: 'XX_NXX_BNxXxxxNxKxxKNNwXXxxXXXXxNxXNHHxxNxx',
     membership: {
         patron_status: 'something_else'
     },

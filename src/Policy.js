@@ -2,27 +2,33 @@ const ERROR_INACTIVE = 'ERROR_INACTIVE';
 const ERROR_INVALID = 'ERROR_INVALID';
 const ERROR_INSUFFICIENT = 'ERROR_INSUFFICIENT';
 
-const Policy = function (config) {
+const Policy = function(config) {
     const minimumPledge = config.minimumPledgeCents;
 
     function decideAccessByMembership(data) {
-        if (data && data.membership && data.tier) {
-            const membership = data.membership;
-            const tier = data.tier;
+        if (data && data.id && data.fullName && data.accessToken) {
+            if (data.membership) {
+                const membership = data.membership;
 
-            if (membership.patron_status === 'active_patron') {
-                const currentPledgeAmount = membership.currently_entitled_amount_cents;
+                if (membership.patron_status === 'active_patron') {
+                    const currentPledgeAmount = membership.currently_entitled_amount_cents;
 
-                if (currentPledgeAmount < minimumPledge)
+                    if (currentPledgeAmount >= minimumPledge) {
+                        return {
+                            success: true
+                        };
+                    }
                     return {
                         success: false,
                         errorType: ERROR_INSUFFICIENT
                     };
-                else return {
-                    success: true
+                }
+                return {
+                    success: false,
+                    errorType: ERROR_INACTIVE
                 };
             }
-            else return {
+            return {
                 success: false,
                 errorType: ERROR_INACTIVE
             };
