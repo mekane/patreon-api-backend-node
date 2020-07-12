@@ -51,6 +51,7 @@ function initialize(port, oauthPath, injectedPatreonApi, injectedDataStore, inje
     app.get('/login', showLoginPage);
     app.get(oauthPath, handleOauthRedirectFromPatreon);
     app.get(protectedRoute, handleRequestForProtectedPage);
+    app.get('/test/view/:name', testView);
 
     // Start App
     app.listen(port, () => console.log(`Patreon Backend app listening on port ${port}!`));
@@ -103,7 +104,7 @@ function handleOauthRedirectFromPatreon(req, res) {
 function handleRequestForProtectedPage(req, res) {
     console.log('=============== Begin Request For Calculator ===============');
 
-    const sessionKey = getSessionKeyFromCookie();
+    const sessionKey = getSessionKeyFromCookie(req);
     const accessToken = getAccessKeyFromSessionData(sessionKey);
 
     patreonApi.getIdentity(accessToken)
@@ -142,24 +143,44 @@ function handleRequestForProtectedPage(req, res) {
             return res.render('invalidDataError', {title: 'Patreon Data Error', reqestId: sessionKey});
         });
 
-    function getSessionKeyFromCookie() {
-        const cookies = req.cookies;
-        if (cookies && cookies[sessionCookieName])
-            return cookies[sessionCookieName];
-        return null;
-    }
 
-    function getAccessKeyFromSessionData(key) {
-        return dataStore.get(sessionKey);
-    }
 }
 
+function getSessionKeyFromCookie(req) {
+    const cookies = req.cookies;
+    if (cookies && cookies[sessionCookieName])
+        return cookies[sessionCookieName];
+    return null;
+}
+
+function getAccessKeyFromSessionData(key) {
+    return dataStore.get(key);
+}
 
 function showLoginPage(req, res) {
     const title = "Login with Patreon";
     const patreonLoginUrl = patreonApi.getLoginUrl();
 
     res.render('loginPage', {title, patreonLoginUrl});
+}
+
+function testView(req, res) {
+    const sessionKey = getSessionKeyFromCookie(req);
+    const accessToken = getAccessKeyFromSessionData(sessionKey);
+
+    patreonApi.getIdentity(accessToken)
+        .then(patreonUserData => {
+            const action = policy.decideAccessByMembership(patreonUserData);
+
+            if (action.success && action.reason === 'Magic User') {
+                const viewName = req.params.name;
+                return res.render(viewName, {
+                    name: patreonUserData.fullName,
+                    title: `Test ${viewName}`,
+                    reqestId: sessionKey
+                });
+            }
+        });
 }
 
 module.exports = {
