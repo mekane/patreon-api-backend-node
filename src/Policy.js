@@ -8,7 +8,7 @@ const Policy = function(config = {}) {
 
     function decideAccessByMembership(data) {
         if (data && data.id && data.fullName && data.accessToken) {
-            if (magicUsers.some(name => name === data.fullName)) {
+            if (magicUsers.some(name => name.trim() === data.fullName.trim())) {
                 return {
                     success: true,
                     reason: 'Magic User'
