@@ -43,8 +43,8 @@ function getIdentity(accessToken) {
         query: {
             include: 'memberships.currently_entitled_tiers',
             'fields[user]': 'about,created,email,first_name,last_name',
-            'fields[member]': 'patron_status,is_follower,full_name,email,pledge_relationship_start,lifetime_support_cents,currently_entitled_amount_cents,last_charge_date,last_charge_status,will_pay_amount_cents',
-            'fields[tier]': 'description,title,amount_cents'
+            'fields[member]': 'full_name,email,patron_status,is_follower,pledge_relationship_start,lifetime_support_cents,currently_entitled_amount_cents,last_charge_date,last_charge_status,will_pay_amount_cents,pledge_cadence',
+            'fields[tier]': 'amount_cents,title'
         }
     });
 
