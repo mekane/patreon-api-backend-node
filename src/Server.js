@@ -118,8 +118,7 @@ function handleRequestForProtectedPage(req, res) {
             if (action.success) {
                 logger.Info(`Successful access by ${patreonUserData.fullName}`, `Session ${sessionKey}`);
                 return res.render('successPage', {name: patreonUserData.fullName, title: 'Success'});
-            }
-            else {
+            } else {
                 switch (action.errorType) {
                     case policy.ERROR_INVALID:
                         logger.Error(`Invalid user data ${JSON.stringify(patreonUserData)}`, `Session ${sessionKey}`);
@@ -128,7 +127,10 @@ function handleRequestForProtectedPage(req, res) {
                         logger.Error(`User ${patreonUserData.fullName} denied access because they are inactive`, `Session ${sessionKey}`);
                         return res.render('inactivePledgeDenied', {title: 'Patreon User Inactive'});
                     case policy.ERROR_INSUFFICIENT:
-                        logger.Error(`User ${patreonUserData.fullName} denied access because their pledge tier is too low ${JSON.stringify(patreonUserData.tier)}`, `Session ${sessionKey}`);
+                        const fullName = patreonUserData.fullName || '<Missing Username>';
+                        const tier = patreonUserData.tier || {};
+                        const tierName = tier.title || '<Missing Tier Name>';
+                        logger.Error(`User ${fullName} denied access because their pledge tier is too low ${tierName}`, `Session ${sessionKey}`);
                         return res.render('insufficientPledgeDenied', {
                             title: 'Insufficient Pledge Tier',
                             tierName: patreonUserData.tier.title
