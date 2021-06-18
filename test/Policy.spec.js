@@ -86,7 +86,14 @@ describe('Action decisions based on the membership data', () => {
 });
 
 /* Note that this is the form that it takes when coming back from the API Interface */
-
+/**
+ * TODO: make sure tests cover all patron_status
+ *
+ patron_status	string
+ One of active_patron, declined_patron, former_patron.
+ Can be null. A null value indicates the member has never pledged.
+ *
+ */
 var nonPledgingPatreonUser = {
     id: '2002001',
     fullName: 'Marty Kane',
@@ -177,3 +184,5 @@ var sufficientPledgeUserData = {
         title: 'Tier 2'
     }
 };
+
+//TODO: include the case where the user's pledge is current but currently_entitled_cents is zero
